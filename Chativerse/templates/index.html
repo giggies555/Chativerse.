@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chativerse</title>
+  <style>
+    body { font-family: sans-serif; background: #f5f5ff; padding: 20px; }
+    #login, #account-selection, #make-account, #chat { max-width: 400px; margin: auto; }
+    #chat-messages { border: 1px solid #ccc; height: 250px; overflow-y: scroll; background: #fff; padding: 10px; }
+    input { width: 100%; margin: 5px 0; padding: 8px; }
+    button { padding: 8px 10px; margin-top: 10px; width: 100%; }
+    .profile-pic { width: 30px; height: 30px; vertical-align: middle; border-radius: 50%; margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Enter Chativerse</h2>
+  <input id="q1" placeholder="What is the code?" />
+  <input id="q2" placeholder="Chicken" />
+  <input id="q3" placeholder="When life gives you *******, give him a cheese" />
+  <button onclick="tryLogin()">Enter</button>
+  <p id="login-msg" style="color:red;"></p>
+</div>
+
+<div id="account-selection" style="display:none;">
+  <h2>Select Account</h2>
+  <select id="account-list"></select>
+  <button onclick="enterChat()">Enter Chat</button>
+  <p><a href="#" onclick="showMakeAccount()">make account!</a></p>
+</div>
+
+<div id="make-account" style="display:none;">
+  <h2>Make Account</h2>
+  <input id="username" placeholder="Username" />
+  <input id="profile-pic" placeholder="Profile Picture URL" />
+  <button onclick="createAccount()">Create</button>
+</div>
+
+<div id="chat" style="display:none;">
+  <h2>Chativerse Chat</h2>
+  <div id="chat-messages"></div>
+  <input id="chat-input" placeholder="Type your message..." />
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+  const correctAnswers = {
+    q1: "331233",
+    q2: "Banana",
+    q3: "phe phe"
+  };
+
+  let selectedAccount = null;
+  let socket;
+
+  function tryLogin() {
+    const a1 = document.getElementById("q1").value.trim().toLowerCase();
+    const a2 = document.getElementById("q2").value.trim().toLowerCase();
+    const a3 = document.getElementById("q3").value.trim().toLowerCase();
+
+    if (
+      a1 === correctAnswers.q1.toLowerCase() &&
+      a2 === correctAnswers.q2.toLowerCase() &&
+      a3 === correctAnswers.q3.toLowerCase()
+    ) {
+      document.getElementById("login").style.display = "none";
+      loadAccounts();
+      document.getElementById("account-selection").style.display = "block";
+    } else {
+      document.getElementById("login-msg").textContent = "Wrong answers!";
+    }
+  }
+
+  function loadAccounts() {
+    const list = JSON.parse(localStorage.getItem("chativerse_accounts") || "[]");
+    const select = document.getElementById("account-list");
+    select.innerHTML = "";
+    for (const acc of list) {
+      const opt = document.createElement("option");
+      opt.value = acc.username;
+      opt.textContent = acc.username;
+      select.appendChild(opt);
+    }
+  }
+
+  function showMakeAccount() {
+    document.getElementById("account-selection").style.display = "none";
+    document.getElementById("make-account").style.display = "block";
+  }
+
+  function createAccount() {
+    const username = document.getElementById("username").value.trim();
+    const pic = document.getElementById("profile-pic").value.trim();
+
+    if (!username) return alert("Username required.");
+
+    const list = JSON.parse(localStorage.getItem("chativerse_accounts") || "[]");
+    list.push({ username, pic });
+    localStorage.setItem("chativerse_accounts", JSON.stringify(list));
+
+    document.getElementById("make-account").style.display = "none";
+    document.getElementById("account-selection").style.display = "block";
+    loadAccounts();
+  }
+
+  function enterChat() {
+    const selected = document.getElementById("account-list").value;
+    const list = JSON.parse(localStorage.getItem("chativerse_accounts") || "[]");
+    selectedAccount = list.find(acc => acc.username === selected);
+
+    document.getElementById("account-selection").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+
+    connectWebSocket();
+  }
+
+  function connectWebSocket() {
+    socket = new WebSocket(`ws://${location.host}/ws`);
+
+    socket.onmessage = function (event) {
+      const data = JSON.parse(event.data);
+      const p = document.createElement("p");
+      const img = data.pic ? `<img src="${data.pic}" class="profile-pic" />` : "";
+      p.innerHTML = `${img}<strong>${data.username}</strong>: ${escapeHtml(data.message)}`;
+      document.getElementById("chat-messages").appendChild(p);
+      document.getElementById("chat-messages").scrollTop = document.getElementById("chat-messages").scrollHeight;
+    };
+  }
+
+  function sendMessage() {
+    const msg = document.getElementById("chat-input").value.trim();
+    if (!msg) return;
+
+    const data = {
+      username: selectedAccount.username,
+      pic: selectedAccount.pic,
+      message: msg
+    };
+
+    socket.send(JSON.stringify(data));
+
+    document.getElementById("chat-input").value = "";
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.innerText = text;
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>
